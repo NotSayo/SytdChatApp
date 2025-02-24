@@ -1,0 +1,147 @@
+﻿@page "/"
+@using Blazored.LocalStorage
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager Nav
+
+<PageTitle>Chat App</PageTitle>
+
+<div class="container mt-4">
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-danger">
+            <h5>Error loading service:</h5>
+            <p>@ErrorMessage</p>
+        </div>
+    }
+    else if (string.IsNullOrEmpty(Name))
+    {
+        <div class="card shadow p-4">
+            <h5 class="mb-3">Enter your name:</h5>
+            <input type="text" class="form-control mb-2" @bind="NewName" placeholder="Your name..." />
+            @if (!string.IsNullOrEmpty(SetNameError))
+            {
+                <div class="text-danger">@SetNameError</div>
+            }
+            <button class="btn btn-primary mt-2" @onclick="SubmitName">Join Chat</button>
+        </div>
+    }
+    else
+    {
+        <div class="card shadow p-4">
+            <h3 class="mb-3">Chat Room</h3>
+
+            <div class="chat-box border p-3 mb-3" style="height: 300px; overflow-y: auto;">
+                @foreach (var message in Messages)
+                {
+                    @if (message.Owner == "System")
+                    {
+                        <div class="text-primary">
+                            <strong>📢 @message.Owner</strong> <span class="text-muted">(@message.SendDate.ToShortTimeString())</span>
+                            <p class="small">@message.Content</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mb-2">
+                            <strong>@message.Owner</strong> <span class="text-muted">(@message.SendDate.ToShortTimeString())</span>
+                            <p class="small">@message.Content</p>
+                        </div>
+                    }
+                }
+            </div>
+
+            <div>
+                <label class="form-label">Enter your message:</label>
+                <input class="form-control mb-2" @bind="NewMessage" placeholder="Type a message..." />
+                <button class="btn btn-success mt-2" @onclick="SendMessage">Send</button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    public string? ErrorMessage { get; set; }
+    public string? SetNameError { get; set; }
+
+    private HubConnection? Connection { get; set; }
+    private string NewName { get; set; } = "";
+    private string Name { get; set; } = "";
+
+    private List<Message> Messages { get; set; } = new List<Message>();
+    private string NewMessage { get; set; } = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Connection = new HubConnectionBuilder()
+            .WithUrl(Nav.ToAbsoluteUri("http://localhost:54321/chat"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        try
+        {
+            await Connection.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            return;
+        }
+
+        await RegisterEvents();
+    }
+
+    public async Task RegisterEvents()
+    {
+        Connection!.On("NameExistsError", async () =>
+        {
+            SetNameError = "Name already exists";
+            await InvokeAsync(StateHasChanged);
+        });
+
+        Connection!.On<string>("NameSet", async (username) =>
+        {
+            Name = username;
+            await InvokeAsync(StateHasChanged);
+        });
+
+        Connection!.On<Message>("ReceiveMessage", async (msg) =>
+        {
+            Messages.Add(msg);
+            await InvokeAsync(StateHasChanged);
+        });
+
+        Connection!.On<string>("UserChange", async (msg) =>
+        {
+            Messages.Add(new Message
+            {
+                Owner = "System",
+                Content = msg,
+                SendDate = DateTime.Now
+            });
+            await InvokeAsync(StateHasChanged);
+        });
+    }
+
+    public async Task SubmitName()
+    {
+        await Connection!.InvokeAsync("SetName", NewName);
+        NewMessage = "";
+    }
+
+    public async Task SendMessage()
+    {
+        await Connection!.InvokeAsync("SendMessage", Name, new Message()
+        {
+            Owner = Name,
+            Content = NewMessage,
+            SendDate = DateTime.Now
+        });
+    }
+
+    private class Message
+    {
+        public required string Owner { get; set; }
+        public required string Content { get; set; }
+        public required DateTime SendDate { get; set; }
+    }
+}
