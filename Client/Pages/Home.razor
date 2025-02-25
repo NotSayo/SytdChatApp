@@ -29,9 +29,15 @@
     }
     else
     {
-        <button @onclick="CreateRoom">Create Room</button>
-        <input @bind="RoomCode"/>
-        <button @onclick="JoinRoom">Join Room</button>
+        <div class="d-flex align-items-center gap-2 mt-3">
+            <button class="btn btn-success" @onclick="CreateRoom">
+                <i class="bi bi-plus-circle"></i> Create Room
+            </button>
+            <input type="text" class="form-control w-auto" @bind="RoomCode" placeholder="Enter Room Code..." />
+            <button class="btn btn-primary" @onclick="JoinRoom">
+                <i class="bi bi-box-arrow-in-right"></i> Join Room
+            </button>
+        </div>
     }
 </div>
 
