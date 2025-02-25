@@ -8,8 +8,14 @@
 <PageTitle>Chat App</PageTitle>
 
 <div class="card shadow p-4">
-    <h3 class="mb-3">Chat Room </h3>
-    <h4 class="mb-3">Room Code: @Code </h4>
+    <div class="d-flex justify-content-between align-items-center">
+        <button class="btn btn-secondary" @onclick="GoBack">
+            <i class="bi bi-arrow-left"></i> Go Back
+        </button>
+        <h3 class="mb-0">Chat Room</h3>
+    </div>
+    <hr />
+    <h4 class="mb-3">Room Code: <span class="badge bg-primary">@Code</span></h4>
 
     <div class="chat-box border p-3 mb-3" style="height: 300px; overflow-y: auto;">
         @foreach (var message in Messages)
@@ -45,7 +51,6 @@
 
     public string Name { get; set; } = "";
 
-
     private List<Message> Messages { get; set; } = new();
     private string NewMessage { get; set; } = "";
 
@@ -73,7 +78,6 @@
 
         Name = name;
         await LocalStorage.RemoveItemAsync("username");
-
 
         RegisterEvents();
     }
@@ -116,4 +120,10 @@
         public required DateTime SendDate { get; set; }
     }
 
+    private async Task GoBack()
+    {
+        await Connection.InvokeAsync("LeaveRoom", Code);
+        await LocalStorage.SetItemAsStringAsync("username", Name);
+        Nav.NavigateTo("/");
+    }
 }

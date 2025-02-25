@@ -15,8 +15,14 @@ public class ChatHub : Hub
     {
          await base.OnDisconnectedAsync(exception);
          var username = Context.Items["username"] as string;
-         await Clients.All.SendAsync("UserChange", $"User disconnected: {username ?? "Unknown"}");
-         UsernameStorage.Storage.Where(s => s.Value == username).ToList().ForEach(s => UsernameStorage.Storage.Remove(s.Key));
+         var roomCode = Context.Items["room"] as string;
+         if (string.IsNullOrEmpty(roomCode))
+             roomCode = "";
+         await Clients.Group(roomCode).SendAsync("UserChange", $"User disconnected: {username ?? "Unknown"}");
+         // await Clients.All.SendAsync("UserChange", $"User disconnected from server: {username ?? "Unknown"}");
+         UsernameStorage.Storage.Where(s => s.Value == username)
+             .ToList()
+             .ForEach(s => UsernameStorage.Storage.Remove(s.Key));
     }
 
     public async Task SetName(string username)
@@ -33,33 +39,46 @@ public class ChatHub : Hub
 
     // Rooms
 
+    public async Task GetRooms()
+    {
+        await Clients.Caller.SendAsync("ReceiveRooms", RoomCodes.Codes);
+    }
+
     public async Task CreateRoom()
     {
-        Console.WriteLine("Creating room " + Context.ConnectionId);
         var roomcode = Guid.NewGuid().ToString().Substring(0, 6);
         RoomCodes.Codes.Add(roomcode!);
+        Context.Items["room"] = roomcode;
         await Groups.AddToGroupAsync(Context.ConnectionId, roomcode!);
         await Clients.Caller.SendAsync("MoveToRoom", roomcode);
         await Clients.Group(roomcode).SendAsync("UserChange", $"User connected: {Context.Items["username"] as string}");
+        await Clients.All.SendAsync("ReceiveRooms", RoomCodes.Codes);
     }
 
     public async Task JoinRoom(string roomcode)
     {
-        Console.WriteLine("Joining room " + Context.ConnectionId);
         if (!RoomCodes.Codes.Any(s => s == roomcode))
         {
             await Clients.Caller.SendAsync("RoomDoesNotExist");
             return;
         }
+        Context.Items["room"] = roomcode;
         await Groups.AddToGroupAsync(Context.ConnectionId, roomcode);
         await Clients.Caller.SendAsync("MoveToRoom", roomcode);
         await Clients.Group(roomcode).SendAsync("UserChange", $"User connected: {Context.Items["username"] as string}");
+        await Clients.All.SendAsync("ReceiveRooms", RoomCodes.Codes);
+    }
+
+    public async Task LeaveRoom(string roomCode)
+    {
+        Context.Items.Remove("room");
+        await Clients.Group(roomCode).SendAsync("UserChange", $"User disconnected from Room: {Context.Items["username"] as string}");
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, roomCode);
     }
 
     // Messages
     public async Task SendMessage(string code, Message message)
     {
-        Console.WriteLine(code);
         await Clients.Group(code).SendAsync("ReceiveMessage", message);
     }
 

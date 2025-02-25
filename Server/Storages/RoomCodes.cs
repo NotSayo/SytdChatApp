@@ -2,5 +2,5 @@
 
 public static class RoomCodes
 {
-    public static List<string> Codes { get; set; } = new();
+    public static List<string> Codes { get; set; } = ["General"];
 }
