@@ -21,6 +21,9 @@ public class ChatHub : Hub
              await Clients.Group(roomCode).SendAsync("UserChange", $"User disconnected: {username ?? "Unknown"}");
              await Groups.RemoveFromGroupAsync(Context.ConnectionId, roomCode);
              await LeaveRoom(roomCode);
+             if(!string.IsNullOrEmpty(username))
+                 RoomCodes.Codes[roomCode].Remove(username);
+             await GetRoomsWithUsers(roomCode);
          }
          // await Clients.All.SendAsync("UserChange", $"User disconnected from server: {username ?? "Unknown"}");
          UsernameStorage.Storage.Where(s => s.Value == username)
@@ -47,10 +50,16 @@ public class ChatHub : Hub
         await Clients.Caller.SendAsync("ReceiveRooms", RoomCodes.Codes.Keys.ToList());
     }
 
+    public async Task GetRoomsWithUsers(string roomCode)
+    {
+        await Clients.Group(roomCode).SendAsync("ReceiveRoomsWithUsers", RoomCodes.Codes);
+    }
+
     public async Task CreateRoom()
     {
         var roomcode = Guid.NewGuid().ToString().Substring(0, 6);
-        RoomCodes.Codes.Add(roomcode, 1);
+        var username = Context.Items["username"] as string ?? "user";
+        RoomCodes.Codes.Add(roomcode, new List<string>() {username});
         Context.Items["room"] = roomcode;
         await Groups.AddToGroupAsync(Context.ConnectionId, roomcode);
         await Clients.Caller.SendAsync("MoveToRoom", roomcode);
@@ -66,26 +75,33 @@ public class ChatHub : Hub
             return;
         }
 
-        RoomCodes.Codes[roomcode]++;
+        var username = Context.Items["username"] as string;
+        if(!string.IsNullOrEmpty(username))
+            RoomCodes.Codes[roomcode].Add(username);
+
         Context.Items["room"] = roomcode;
         await Groups.AddToGroupAsync(Context.ConnectionId, roomcode);
         await Clients.Caller.SendAsync("MoveToRoom", roomcode);
         await Clients.Group(roomcode).SendAsync("UserChange", $"User connected: {Context.Items["username"] as string}");
         await Clients.All.SendAsync("ReceiveRooms", RoomCodes.Codes.Keys.ToList());
+        await GetRoomsWithUsers(roomcode);
     }
 
     public async Task LeaveRoom(string roomCode)
     {
-
         Context.Items.Remove("room");
         await Clients.Group(roomCode).SendAsync("UserChange", $"User disconnected from Room: {Context.Items["username"] as string}");
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, roomCode);
-        RoomCodes.Codes[roomCode]--;
-        if (RoomCodes.Codes[roomCode] == 0 && roomCode != "General")
+        var username = Context.Items["username"] as string;
+        if(!string.IsNullOrEmpty(username))
+            RoomCodes.Codes[roomCode].Remove(username);
+
+        if (RoomCodes.Codes[roomCode].Count == 0 && roomCode != "General")
         {
             RoomCodes.Codes.Remove(roomCode);
             await Clients.All.SendAsync("ReceiveRooms", RoomCodes.Codes.Keys.ToList());
         }
+        await GetRoomsWithUsers(roomCode);
     }
 
     // Messages

@@ -42,12 +42,37 @@
         <input class="form-control mb-2" @bind="NewMessage" placeholder="Type a message..." />
         <button class="btn btn-success mt-2" @onclick="SendMessage">Send</button>
     </div>
+
+    <hr />
+
+    <div>
+        <h4 class="mb-3"><i class="bi bi-people-fill text-primary"></i> Active Users</h4>
+        <div class="border rounded p-2 bg-light" style="max-height: 150px; overflow-y: auto;">
+            @if (Users.Any())
+            {
+                @foreach (var user in Users)
+                {
+                    <div class="d-flex align-items-center p-2 border-bottom">
+                        <span>@user</span>
+                    </div>
+                }
+            }
+            else
+            {
+                <p class="text-muted text-center mb-0">No users in this room.</p>
+            }
+        </div>
+    </div>
 </div>
+
+
 
 @code {
     [SupplyParameterFromQuery]
     [Parameter]
     public required string Code { get; set; }
+
+    public List<string> Users { get; set; } = new();
 
     public string Name { get; set; } = "";
 
@@ -80,6 +105,8 @@
         await LocalStorage.RemoveItemAsync("username");
 
         RegisterEvents();
+
+        await Connection.InvokeAsync("GetRoomsWithUsers", Code);
     }
 
     private void RegisterEvents()
@@ -98,6 +125,12 @@
                 Content = msg,
                 SendDate = DateTime.Now
             });
+            await InvokeAsync(StateHasChanged);
+        });
+
+        Connection.On<Dictionary<string, List<string>>>("ReceiveRoomsWithUsers", async (roomInfo) =>
+        {
+            Users = roomInfo[Code];
             await InvokeAsync(StateHasChanged);
         });
     }

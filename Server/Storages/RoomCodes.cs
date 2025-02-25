@@ -2,8 +2,8 @@
 
 public static class RoomCodes
 {
-    public static Dictionary<string, int> Codes { get; set; } = new ()
+    public static Dictionary<string, List<string>> Codes { get; set; } = new ()
     {
-        {"General", 0}
+        {"General", new ()}
     };
 }

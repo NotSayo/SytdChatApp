@@ -53,10 +53,10 @@
         </div>
 
         <h4 class="mt-4">Available Rooms</h4>
-        @if (AvailabeRooms.Any())
+        @if (AvailableRooms.Any())
         {
             <div class="list-group mt-2">
-                @foreach (var room in AvailabeRooms)
+                @foreach (var room in AvailableRooms)
                 {
                     <button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
                             style="cursor: pointer;"
@@ -80,6 +80,7 @@
     }
 
 
+
 </div>
 
 @code {
@@ -91,7 +92,7 @@
     private string Name { get; set; } = "";
     public string RoomCode { get; set; } = "";
 
-    public List<string> AvailabeRooms { get; set; } = new();
+    public List<string> AvailableRooms { get; set; } = new();
 
 
     protected override async Task OnInitializedAsync()
@@ -115,6 +116,7 @@
             return;
         Name = takenName;
         await LocalStorage.RemoveItemAsync("username");
+
         await InvokeAsync(StateHasChanged);
     }
 
@@ -146,7 +148,7 @@
 
         Connection!.On<List<string>>("ReceiveRooms", async (rooms) =>
         {
-            AvailabeRooms = rooms;
+            AvailableRooms = rooms;
             await InvokeAsync(StateHasChanged);
         });
     }
