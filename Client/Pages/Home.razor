@@ -2,6 +2,8 @@
 @using Blazored.LocalStorage
 @using Microsoft.AspNetCore.SignalR.Client
 @inject NavigationManager Nav
+@inject ILocalStorageService LocalStorage
+@inject HubConnection Connection
 
 <PageTitle>Chat App</PageTitle>
 
@@ -27,59 +29,28 @@
     }
     else
     {
-        <div class="card shadow p-4">
-            <h3 class="mb-3">Chat Room</h3>
-
-            <div class="chat-box border p-3 mb-3" style="height: 300px; overflow-y: auto;">
-                @foreach (var message in Messages)
-                {
-                    @if (message.Owner == "System")
-                    {
-                        <div class="text-primary">
-                            <strong>📢 @message.Owner</strong> <span class="text-muted">(@message.SendDate.ToShortTimeString())</span>
-                            <p class="small">@message.Content</p>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="mb-2">
-                            <strong>@message.Owner</strong> <span class="text-muted">(@message.SendDate.ToShortTimeString())</span>
-                            <p class="small">@message.Content</p>
-                        </div>
-                    }
-                }
-            </div>
-
-            <div>
-                <label class="form-label">Enter your message:</label>
-                <input class="form-control mb-2" @bind="NewMessage" placeholder="Type a message..." />
-                <button class="btn btn-success mt-2" @onclick="SendMessage">Send</button>
-            </div>
-        </div>
+        <button @onclick="CreateRoom">Create Room</button>
+        <input @bind="RoomCode"/>
+        <button @onclick="JoinRoom">Join Room</button>
     }
 </div>
 
 @code {
     public string? ErrorMessage { get; set; }
     public string? SetNameError { get; set; }
+    public string? RoomJoinError { get; set; }
 
-    private HubConnection? Connection { get; set; }
     private string NewName { get; set; } = "";
     private string Name { get; set; } = "";
+    public string RoomCode { get; set; } = "";
 
-    private List<Message> Messages { get; set; } = new List<Message>();
-    private string NewMessage { get; set; } = "";
 
     protected override async Task OnInitializedAsync()
     {
-        Connection = new HubConnectionBuilder()
-            .WithUrl(Nav.ToAbsoluteUri("http://localhost:54321/chat"))
-            .WithAutomaticReconnect()
-            .Build();
-
         try
         {
-            await Connection.StartAsync();
+            if(Connection.State != HubConnectionState.Connected)
+                await Connection.StartAsync();
         }
         catch (Exception ex)
         {
@@ -87,10 +58,10 @@
             return;
         }
 
-        await RegisterEvents();
+        RegisterEvents();
     }
 
-    public async Task RegisterEvents()
+    private void RegisterEvents()
     {
         Connection!.On("NameExistsError", async () =>
         {
@@ -104,44 +75,36 @@
             await InvokeAsync(StateHasChanged);
         });
 
-        Connection!.On<Message>("ReceiveMessage", async (msg) =>
+        Connection!.On<string>("MoveToRoom", async (code) =>
         {
-            Messages.Add(msg);
-            await InvokeAsync(StateHasChanged);
+            await LocalStorage.SetItemAsStringAsync("username", Name);
+            Nav.NavigateTo($"/chat/{code}");
         });
 
-        Connection!.On<string>("UserChange", async (msg) =>
+        Connection!.On("RoomDoesNotExist", async () =>
         {
-            Messages.Add(new Message
-            {
-                Owner = "System",
-                Content = msg,
-                SendDate = DateTime.Now
-            });
+            RoomJoinError = "Room does not exist";
             await InvokeAsync(StateHasChanged);
         });
     }
 
-    public async Task SubmitName()
+    private async Task SubmitName()
     {
         await Connection!.InvokeAsync("SetName", NewName);
-        NewMessage = "";
+        NewName = "";
     }
 
-    public async Task SendMessage()
+    private async Task CreateRoom()
     {
-        await Connection!.InvokeAsync("SendMessage", Name, new Message()
-        {
-            Owner = Name,
-            Content = NewMessage,
-            SendDate = DateTime.Now
-        });
+        await Connection!.InvokeAsync("CreateRoom");
     }
 
-    private class Message
+    private async Task JoinRoom()
     {
-        public required string Owner { get; set; }
-        public required string Content { get; set; }
-        public required DateTime SendDate { get; set; }
+        await Connection!.InvokeAsync("JoinRoom", RoomCode);
     }
+
+
+
+
 }
