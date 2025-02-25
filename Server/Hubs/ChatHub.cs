@@ -16,9 +16,7 @@ public class ChatHub : Hub
          await base.OnDisconnectedAsync(exception);
          var username = Context.Items["username"] as string;
          var roomCode = Context.Items["room"] as string;
-         if (string.IsNullOrEmpty(roomCode))
-             roomCode = "";
-         else
+         if (!string.IsNullOrEmpty(roomCode))
          {
              await Clients.Group(roomCode).SendAsync("UserChange", $"User disconnected: {username ?? "Unknown"}");
              await Groups.RemoveFromGroupAsync(Context.ConnectionId, roomCode);
@@ -52,9 +50,9 @@ public class ChatHub : Hub
     public async Task CreateRoom()
     {
         var roomcode = Guid.NewGuid().ToString().Substring(0, 6);
-        RoomCodes.Codes.Add(roomcode!, 1);
+        RoomCodes.Codes.Add(roomcode, 1);
         Context.Items["room"] = roomcode;
-        await Groups.AddToGroupAsync(Context.ConnectionId, roomcode!);
+        await Groups.AddToGroupAsync(Context.ConnectionId, roomcode);
         await Clients.Caller.SendAsync("MoveToRoom", roomcode);
         await Clients.Group(roomcode).SendAsync("UserChange", $"User connected: {Context.Items["username"] as string}");
         await Clients.All.SendAsync("ReceiveRooms", RoomCodes.Codes.Keys.ToList());
